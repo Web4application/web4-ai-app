@@ -1,44 +1,78 @@
 const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const DiscordStrategy = require('passport-discord').Strategy;
-require('dotenv').config();
+const bodyParser = require('body-parser');
+const axios = require('axios');
+const { Client, GatewayIntentBits } = require('discord.js');
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
+const port = 3000;
 
-// Session middleware
-app.use(session({ secret: 'keyboard cat', resave: false, saveUninitialized: false }));
+app.use(bodyParser.json());
 
-// Passport setup
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
-
-// Discord OAuth2 Strategy
-passport.use(new DiscordStrategy({
-  clientID: process.env.DISCORD_CLIENT_ID,
-  clientSecret: process.env.DISCORD_CLIENT_SECRET,
-  callbackURL: 'http://localhost:3000/auth/discord/callback',
-  scope: ['identify', 'email', 'guilds']
-}, (accessToken, refreshToken, profile, done) => {
-  return done(null, profile);
-}));
-
-// Routes
-app.get('/', (req, res) => res.send('<a href="/auth/discord">Login with Discord</a>'));
-
-app.get('/auth/discord', passport.authenticate('discord'));
-
-app.get('/auth/discord/callback',
-  passport.authenticate('discord', { failureRedirect: '/' }),
-  (req, res) => res.redirect('/dashboard')
-);
-
-app.get('/dashboard', (req, res) => {
-  if (!req.isAuthenticated()) return res.redirect('/');
-  res.send(`Hello, ${req.user.username}!`);
+// Discord Bot Setup
+const discordClient = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
-app.listen(3000, () => console.log('App running at http://localhost:3000'));
+discordClient.once('ready', () => {
+  console.log('Discord bot is online!');
+});
+
+discordClient.on('messageCreate', async message => {
+  if (message.author.bot) return;
+
+  if (message.content.startsWith('!analyze')) {
+    const text = message.content.slice(9).trim();
+    if (!text) {
+      return message.channel.send('Please provide some text to analyze.');
+    }
+
+    try {
+      const response = await axios.post('http://localhost:3000/api/analyze', { text });
+      const result = response.data;
+      message.channel.send(`Analysis result: ${result.analysis}`);
+    } catch (error) {
+      console.error('Error analyzing text:', error);
+      message.channel.send('Sorry, I couldn\'t analyze the text at the moment.');
+    }
+  }
+});
+
+// OpenAI API Setup
+const openaiApiKey = process.env.OPENAI_API_KEY;
+
+app.post('/api/analyze', async (req, res) => {
+  const { text } = req.body;
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/completions',
+      {
+        model: 'text-davinci-003',
+        prompt: `Analyze the following text: ${text}`,
+        max_tokens: 100,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+      }
+    );
+
+    const analysis = response.data.choices[0].text.trim();
+    res.json({ analysis });
+  } catch (error) {
+    console.error('Error analyzing text with OpenAI:', error);
+    res.status(500).json({ error: 'Failed to analyze text' });
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
+
+discordClient.login(process.env.DISCORD_TOKEN);

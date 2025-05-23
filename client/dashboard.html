@@ -1,5 +1,44 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web4 AI Interaction</title>
+</head>
+<body>
+  <h1>Welcome to Web4 AI</h1>
+  
+  <label for="userQuery">Ask the AI:</label>
+  <textarea id="userQuery" rows="4" cols="50" placeholder="Enter your question here..."></textarea><br>
+  <button onclick="submitQuery()">Submit</button>
+
+  <h2>AI Response:</h2>
+  <p id="response"></p>
+
+  <script>
+    async function submitQuery() {
+      const query = document.getElementById('userQuery').value;
+      
+      if (query.trim() === "") {
+        alert('Please enter a question!');
+        return;
+      }
+
+      // Make a POST request to your backend API
+      const response = await fetch('http://localhost:3000/api/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: query }),
+      });
+
+      const data = await response.json();
+      document.getElementById('response').innerText = data.result || 'No response from AI';
+    }
+  </script>
+</body>
+</html></div>
 <head>
   <title>WEB4 Dashboard</title>
 </head>

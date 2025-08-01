@@ -40,3 +40,53 @@ with open("/mnt/data/railway.json", "w") as f:
     f.write(railway_json)
 
 "/mnt/data/render.yaml and /mnt/data/railway.json created"
+
+version: "3.7"
+
+services:
+  web:
+    build: ./nginx/
+    image: web4app/nginx:1.0
+    container_name: web4app-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./www/html:/var/www/html
+    depends_on:
+      - php
+    restart: always
+
+  php:
+    build: ./php/
+    image: web4app/php:1.0
+    container_name: web4app-php
+    expose:
+      - "9000"
+    volumes:
+      - ./www/html:/var/www/html
+    restart: always
+
+  mysql:
+    image: mysql:8
+    container_name: web4app-mysql
+    env_file:
+      - .env
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: web4app-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    restart: always
+
+volumes:
+  mysql_data:
